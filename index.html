@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mural de Notas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 60px;
+      font-family: 'Barlow Condensed', sans-serif;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #555;
+      text-transform: uppercase;
+    }
+    .logo span { color: #888; }
+
+    #mural {
+      width: 100%;
+      max-width: 1100px;
+      min-height: 600px;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.04) 39px, rgba(255,255,255,0.04) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.04) 39px, rgba(255,255,255,0.04) 40px),
+        #1a1a1a;
+      padding: 28px;
+      border-radius: 6px;
+      border: 1px solid #2a2a2a;
+    }
+
+    #toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    #toolbar span {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: #666;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-right: 4px;
+    }
+
+    .color-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .color-btn:hover { transform: scale(1.15); }
+    .color-btn.active { border-color: #fff; transform: scale(1.15); }
+
+    #add-btn {
+      margin-left: auto;
+      background: #2d2d2d;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 8px 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+    #add-btn:hover { background: #3a3a3a; }
+
+    #clear-btn {
+      background: transparent;
+      color: #555;
+      border: 1px solid #333;
+      padding: 8px 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #clear-btn:hover { color: #cc4444; border-color: #cc4444; }
+
+    #save-btn {
+      background: transparent;
+      color: #4a8a6a;
+      border: 1px solid #3a6a4a;
+      padding: 8px 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #save-btn:hover { color: #6aaa8a; border-color: #5a9a7a; }
+
+    #notes-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    .note {
+      width: 185px;
+      min-height: 165px;
+      padding: 14px 14px 10px;
+      position: relative;
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      cursor: default;
+      box-shadow: 3px 5px 0px rgba(0,0,0,0.6);
+    }
+    .note:hover {
+      transform: rotate(0deg) scale(1.04) !important;
+      z-index: 10;
+      box-shadow: 5px 8px 0px rgba(0,0,0,0.6);
+    }
+
+    .note-pin {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #eee, #888);
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      z-index: 2;
+    }
+
+    .note-category {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.55;
+      border: none;
+      background: transparent;
+      width: 100%;
+      cursor: text;
+      padding: 0;
+    }
+    .note-category:focus { outline: none; opacity: 0.85; }
+
+    .note-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      border: none;
+      background: transparent;
+      resize: none;
+      width: 100%;
+      flex: 1;
+      min-height: 90px;
+      cursor: text;
+      letter-spacing: 0.2px;
+    }
+    .note-text:focus { outline: none; }
+
+    .note-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .note-date {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      opacity: 0.4;
+      letter-spacing: 0.5px;
+    }
+
+    .note-del {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      opacity: 0.3;
+      font-size: 14px;
+      line-height: 1;
+      transition: opacity 0.1s;
+      padding: 0;
+      color: inherit;
+    }
+    .note-del:hover { opacity: 0.9; }
+
+    .empty-state {
+      width: 100%;
+      text-align: center;
+      padding: 70px 0;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #333;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .note-r1 { transform: rotate(-1.5deg); }
+    .note-r2 { transform: rotate(1.2deg); }
+    .note-r3 { transform: rotate(-0.7deg); }
+    .note-r4 { transform: rotate(2deg); }
+    .note-r5 { transform: rotate(-2.2deg); }
+
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #2d2d2d;
+      color: #aaa;
+      border: 1px solid #444;
+      padding: 10px 24px;
+      border-radius: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      transition: transform 0.3s ease;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">// <span>mural</span> de notas</div>
+    <div class="logo" id="note-count">0 notas</div>
+  </header>
+
+  <div id="mural">
+    <div id="toolbar">
+      <span>// cor</span>
+      <div class="color-btn active" data-color="yellow" style="background:#d4b84a;" title="Âmbar"></div>
+      <div class="color-btn" data-color="slate"    style="background:#4a6fa5;" title="Azul aço"></div>
+      <div class="color-btn" data-color="olive"    style="background:#6b7c3a;" title="Verde oliva"></div>
+      <div class="color-btn" data-color="rust"     style="background:#a0522d;" title="Ferrugem"></div>
+      <div class="color-btn" data-color="charcoal" style="background:#555;"    title="Carvão"></div>
+      <button id="save-btn">salvar</button>
+      <button id="clear-btn">limpar tudo</button>
+      <button id="add-btn">+ nova nota</button>
+    </div>
+    <div id="notes-grid"></div>
+  </div>
+
+  <div id="toast">notas salvas com sucesso</div>
+
+  <script>
+    const COLORS = {
+      yellow:   { bg: '#d4b84a', text: '#2a1f00', placeholder: '#7a5f10' },
+      slate:    { bg: '#4a6fa5', text: '#e8f0ff', placeholder: '#9fb5d8' },
+      olive:    { bg: '#6b7c3a', text: '#f0f4e0', placeholder: '#a8b87a' },
+      rust:     { bg: '#a0522d', text: '#ffe8d6', placeholder: '#cc9977' },
+      charcoal: { bg: '#555',    text: '#e8e8e8', placeholder: '#999' },
+    };
+
+    const ROTATIONS = ['note-r1','note-r2','note-r3','note-r4','note-r5'];
+    let currentColor = 'yellow';
+    let noteCount = 0;
+
+    const grid = document.getElementById('notes-grid');
+    const countEl = document.getElementById('note-count');
+
+    function updateCount() {
+      const n = grid.querySelectorAll('.note').length;
+      countEl.textContent = n + (n === 1 ? ' nota' : ' notas');
+    }
+
+    function getDate() {
+      return new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+        .replace('. ', '/').toUpperCase();
+    }
+
+    function showEmpty() {
+      const ex = grid.querySelector('.empty-state');
+      if (grid.querySelectorAll('.note').length === 0) {
+        if (!ex) {
+          const e = document.createElement('div');
+          e.className = 'empty-state';
+          e.textContent = '// mural vazio — crie uma nota';
+          grid.appendChild(e);
+        }
+      } else if (ex) ex.remove();
+      updateCount();
+    }
+
+    function createNote(color, text, cat, date) {
+      noteCount++;
+      const c = COLORS[color] || COLORS.yellow;
+      const rot = ROTATIONS[noteCount % ROTATIONS.length];
+
+      const note = document.createElement('div');
+      note.className = 'note ' + rot;
+      note.style.background = c.bg;
+      note.style.color = c.text;
+      note.dataset.color = color;
+
+      const pin = document.createElement('div');
+      pin.className = 'note-pin';
+
+      const catEl = document.createElement('input');
+      catEl.className = 'note-category';
+      catEl.style.color = c.text;
+      catEl.placeholder = 'CATEGORIA';
+      catEl.value = cat || '';
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'note-text';
+      textarea.style.color = c.text;
+      textarea.style.setProperty('--ph', c.placeholder);
+      textarea.placeholder = 'escreva aqui...';
+      textarea.value = text || '';
+
+      // placeholder color via dynamic style
+      const sid = 'ph-' + noteCount;
+      const s = document.createElement('style');
+      s.id = sid;
+      s.textContent = `.note-text.ph${noteCount}::placeholder { color: ${c.placeholder}; }`;
+      document.head.appendChild(s);
+      textarea.classList.add('ph' + noteCount);
+
+      const footer = document.createElement('div');
+      footer.className = 'note-footer';
+
+      const dateEl = document.createElement('span');
+      dateEl.className = 'note-date';
+      dateEl.textContent = date || getDate();
+
+      const del = document.createElement('button');
+      del.className = 'note-del';
+      del.textContent = '✕';
+      del.onclick = () => { note.remove(); showEmpty(); saveToStorage(); };
+
+      footer.appendChild(dateEl);
+      footer.appendChild(del);
+
+      note.appendChild(pin);
+      note.appendChild(catEl);
+      note.appendChild(textarea);
+      note.appendChild(footer);
+
+      const ex = grid.querySelector('.empty-state');
+      if (ex) ex.remove();
+      grid.appendChild(note);
+
+      textarea.addEventListener('input', saveToStorage);
+      catEl.addEventListener('input', saveToStorage);
+
+      updateCount();
+      return note;
+    }
+
+    // ── Persistência localStorage ──────────────────────────────────
+    function saveToStorage() {
+      const notes = [];
+      grid.querySelectorAll('.note').forEach(n => {
+        notes.push({
+          color: n.dataset.color || 'yellow',
+          text:  n.querySelector('.note-text').value,
+          cat:   n.querySelector('.note-category').value,
+          date:  n.querySelector('.note-date').textContent,
+        });
+      });
+      localStorage.setItem('mural-notes', JSON.stringify(notes));
+    }
+
+    function loadFromStorage() {
+      const raw = localStorage.getItem('mural-notes');
+      if (!raw) return false;
+      try {
+        const notes = JSON.parse(raw);
+        if (!notes.length) return false;
+        notes.forEach(n => createNote(n.color, n.text, n.cat, n.date));
+        return true;
+      } catch { return false; }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    // ── Eventos ────────────────────────────────────────────────────
+    document.querySelectorAll('.color-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentColor = btn.dataset.color;
+      });
+    });
+
+    document.getElementById('add-btn').addEventListener('click', () => {
+      createNote(currentColor);
+      saveToStorage();
+      grid.lastElementChild.querySelector('textarea').focus();
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      if (confirm('Limpar todas as notas?')) {
+        grid.querySelectorAll('.note').forEach(n => n.remove());
+        showEmpty();
+        saveToStorage();
+      }
+    });
+
+    document.getElementById('save-btn').addEventListener('click', () => {
+      saveToStorage();
+      showToast('notas salvas ✓');
+    });
+
+    // ── Init ───────────────────────────────────────────────────────
+    if (!loadFromStorage()) {
+      createNote('yellow',   '', 'PRIORIDADE');
+      createNote('slate',    '', 'TRABALHO');
+      createNote('charcoal', '', 'IDEIAS');
+    }
+    showEmpty();
+  </script>
+</body>
+</html>
