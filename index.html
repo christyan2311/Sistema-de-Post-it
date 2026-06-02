@@ -91,6 +91,7 @@
       transition: background 0.15s;
     }
     #add-btn:hover { background: #3a3a3a; }
+    #add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #clear-btn {
       background: transparent;
@@ -105,20 +106,6 @@
       transition: color 0.15s, border-color 0.15s;
     }
     #clear-btn:hover { color: #cc4444; border-color: #cc4444; }
-
-    #save-btn {
-      background: transparent;
-      color: #4a8a6a;
-      border: 1px solid #3a6a4a;
-      padding: 8px 14px;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 1px;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: color 0.15s, border-color 0.15s;
-    }
-    #save-btn:hover { color: #6aaa8a; border-color: #5a9a7a; }
 
     #notes-grid {
       display: flex;
@@ -264,21 +251,27 @@
   <div id="mural">
     <div id="toolbar">
       <span>// cor</span>
-      <div class="color-btn active" data-color="yellow" style="background:#d4b84a;" title="Âmbar"></div>
-      <div class="color-btn" data-color="slate"    style="background:#4a6fa5;" title="Azul aço"></div>
+      <div class="color-btn active" data-color="yellow" style="background:#d4b84a;" title="Ambar"></div>
+      <div class="color-btn" data-color="slate"    style="background:#4a6fa5;" title="Azul aco"></div>
       <div class="color-btn" data-color="olive"    style="background:#6b7c3a;" title="Verde oliva"></div>
       <div class="color-btn" data-color="rust"     style="background:#a0522d;" title="Ferrugem"></div>
-      <div class="color-btn" data-color="charcoal" style="background:#555;"    title="Carvão"></div>
-      <button id="save-btn">salvar</button>
+      <div class="color-btn" data-color="charcoal" style="background:#555;"    title="Carvao"></div>
       <button id="clear-btn">limpar tudo</button>
       <button id="add-btn">+ nova nota</button>
     </div>
     <div id="notes-grid"></div>
   </div>
 
-  <div id="toast">notas salvas com sucesso</div>
+  <div id="toast"></div>
 
-  <script>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const supabase = createClient(
+      'https://xuklgsgfqgmqrjvxgahu.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1a2xnc2dmcWdtcXJqdnhnYWh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjM3MzcsImV4cCI6MjA5NTk5OTczN30.tVZL7LZzDgXZmspnaF3sABSbhACa91KFruo3RwyV700'
+    );
+
     const COLORS = {
       yellow:   { bg: '#d4b84a', text: '#2a1f00', placeholder: '#7a5f10' },
       slate:    { bg: '#4a6fa5', text: '#e8f0ff', placeholder: '#9fb5d8' },
@@ -289,10 +282,11 @@
 
     const ROTATIONS = ['note-r1','note-r2','note-r3','note-r4','note-r5'];
     let currentColor = 'yellow';
-    let noteCount = 0;
+    let noteIndex = 0;
 
     const grid = document.getElementById('notes-grid');
     const countEl = document.getElementById('note-count');
+    const addBtn = document.getElementById('add-btn');
 
     function updateCount() {
       const n = grid.querySelectorAll('.note').length;
@@ -310,23 +304,52 @@
         if (!ex) {
           const e = document.createElement('div');
           e.className = 'empty-state';
-          e.textContent = '// mural vazio — crie uma nota';
+          e.textContent = '// mural vazio - crie uma nota';
           grid.appendChild(e);
         }
       } else if (ex) ex.remove();
       updateCount();
     }
 
-    function createNote(color, text, cat, date) {
-      noteCount++;
-      const c = COLORS[color] || COLORS.yellow;
-      const rot = ROTATIONS[noteCount % ROTATIONS.length];
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.borderColor = isError ? '#cc4444' : '#444';
+      t.style.color = isError ? '#cc7777' : '#aaa';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2400);
+    }
+
+    const debounceTimers = {};
+
+    function scheduleUpdate(noteEl) {
+      const id = noteEl.dataset.dbId;
+      if (!id) return;
+      clearTimeout(debounceTimers[id]);
+      debounceTimers[id] = setTimeout(() => persistUpdate(noteEl), 800);
+    }
+
+    async function persistUpdate(noteEl) {
+      const id = noteEl.dataset.dbId;
+      if (!id) return;
+      const { error } = await supabase.from('notes').update({
+        text: noteEl.querySelector('.note-text').value,
+        category: noteEl.querySelector('.note-category').value,
+      }).eq('id', id);
+      if (error) showToast('erro ao salvar', true);
+    }
+
+    function buildNoteElement(data) {
+      noteIndex++;
+      const c = COLORS[data.color] || COLORS.yellow;
+      const rot = ROTATIONS[noteIndex % ROTATIONS.length];
 
       const note = document.createElement('div');
       note.className = 'note ' + rot;
       note.style.background = c.bg;
       note.style.color = c.text;
-      note.dataset.color = color;
+      note.dataset.color = data.color;
+      note.dataset.dbId = data.id;
 
       const pin = document.createElement('div');
       pin.className = 'note-pin';
@@ -335,38 +358,33 @@
       catEl.className = 'note-category';
       catEl.style.color = c.text;
       catEl.placeholder = 'CATEGORIA';
-      catEl.value = cat || '';
+      catEl.value = data.category || '';
 
       const textarea = document.createElement('textarea');
       textarea.className = 'note-text';
       textarea.style.color = c.text;
-      textarea.style.setProperty('--ph', c.placeholder);
       textarea.placeholder = 'escreva aqui...';
-      textarea.value = text || '';
+      textarea.value = data.text || '';
 
-      // placeholder color via dynamic style
-      const sid = 'ph-' + noteCount;
       const s = document.createElement('style');
-      s.id = sid;
-      s.textContent = `.note-text.ph${noteCount}::placeholder { color: ${c.placeholder}; }`;
+      s.textContent = `.note-text.ph${noteIndex}::placeholder { color: ${c.placeholder}; }`;
       document.head.appendChild(s);
-      textarea.classList.add('ph' + noteCount);
+      textarea.classList.add('ph' + noteIndex);
 
       const footer = document.createElement('div');
       footer.className = 'note-footer';
 
       const dateEl = document.createElement('span');
       dateEl.className = 'note-date';
-      dateEl.textContent = date || getDate();
+      dateEl.textContent = data.note_date || getDate();
 
       const del = document.createElement('button');
       del.className = 'note-del';
-      del.textContent = '✕';
-      del.onclick = () => { note.remove(); showEmpty(); saveToStorage(); };
+      del.textContent = 'x';
+      del.onclick = () => deleteNote(note);
 
       footer.appendChild(dateEl);
       footer.appendChild(del);
-
       note.appendChild(pin);
       note.appendChild(catEl);
       note.appendChild(textarea);
@@ -376,46 +394,69 @@
       if (ex) ex.remove();
       grid.appendChild(note);
 
-      textarea.addEventListener('input', saveToStorage);
-      catEl.addEventListener('input', saveToStorage);
+      textarea.addEventListener('input', () => scheduleUpdate(note));
+      catEl.addEventListener('input', () => scheduleUpdate(note));
 
       updateCount();
       return note;
     }
 
-    // ── Persistência localStorage ──────────────────────────────────
-    function saveToStorage() {
-      const notes = [];
-      grid.querySelectorAll('.note').forEach(n => {
-        notes.push({
-          color: n.dataset.color || 'yellow',
-          text:  n.querySelector('.note-text').value,
-          cat:   n.querySelector('.note-category').value,
-          date:  n.querySelector('.note-date').textContent,
-        });
-      });
-      localStorage.setItem('mural-notes', JSON.stringify(notes));
+    async function addNote() {
+      addBtn.disabled = true;
+      const position = grid.querySelectorAll('.note').length;
+      const { data, error } = await supabase.from('notes').insert({
+        color: currentColor,
+        text: '',
+        category: '',
+        note_date: getDate(),
+        position,
+      }).select().maybeSingle();
+      addBtn.disabled = false;
+      if (error) { showToast('erro ao criar nota', true); return; }
+      const noteEl = buildNoteElement(data);
+      noteEl.querySelector('textarea').focus();
     }
 
-    function loadFromStorage() {
-      const raw = localStorage.getItem('mural-notes');
-      if (!raw) return false;
-      try {
-        const notes = JSON.parse(raw);
-        if (!notes.length) return false;
-        notes.forEach(n => createNote(n.color, n.text, n.cat, n.date));
-        return true;
-      } catch { return false; }
+    async function deleteNote(noteEl) {
+      const id = noteEl.dataset.dbId;
+      if (id) {
+        const { error } = await supabase.from('notes').delete().eq('id', id);
+        if (error) { showToast('erro ao excluir nota', true); return; }
+      }
+      noteEl.remove();
+      showEmpty();
     }
 
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2200);
+    async function clearAllNotes() {
+      if (!confirm('Limpar todas as notas?')) return;
+      const ids = [...grid.querySelectorAll('.note')].map(n => n.dataset.dbId).filter(Boolean);
+      if (ids.length) {
+        const { error } = await supabase.from('notes').delete().in('id', ids);
+        if (error) { showToast('erro ao limpar notas', true); return; }
+      }
+      grid.querySelectorAll('.note').forEach(n => n.remove());
+      showEmpty();
     }
 
-    // ── Eventos ────────────────────────────────────────────────────
+    async function loadNotes() {
+      const { data, error } = await supabase.from('notes').select('*').order('position').order('created_at');
+      if (error) { showToast('erro ao carregar notas', true); showEmpty(); return; }
+
+      if (!data || data.length === 0) {
+        const defaults = [
+          { color: 'yellow',   text: '', category: 'PRIORIDADE', note_date: getDate(), position: 0 },
+          { color: 'slate',    text: '', category: 'TRABALHO',   note_date: getDate(), position: 1 },
+          { color: 'charcoal', text: '', category: 'IDEIAS',     note_date: getDate(), position: 2 },
+        ];
+        const { data: inserted, error: insertErr } = await supabase.from('notes').insert(defaults).select();
+        if (insertErr) { showToast('erro ao inicializar notas', true); showEmpty(); return; }
+        inserted.forEach(n => buildNoteElement(n));
+      } else {
+        data.forEach(n => buildNoteElement(n));
+      }
+      showEmpty();
+    }
+
     document.querySelectorAll('.color-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
@@ -424,32 +465,10 @@
       });
     });
 
-    document.getElementById('add-btn').addEventListener('click', () => {
-      createNote(currentColor);
-      saveToStorage();
-      grid.lastElementChild.querySelector('textarea').focus();
-    });
+    addBtn.addEventListener('click', addNote);
+    document.getElementById('clear-btn').addEventListener('click', clearAllNotes);
 
-    document.getElementById('clear-btn').addEventListener('click', () => {
-      if (confirm('Limpar todas as notas?')) {
-        grid.querySelectorAll('.note').forEach(n => n.remove());
-        showEmpty();
-        saveToStorage();
-      }
-    });
-
-    document.getElementById('save-btn').addEventListener('click', () => {
-      saveToStorage();
-      showToast('notas salvas ✓');
-    });
-
-    // ── Init ───────────────────────────────────────────────────────
-    if (!loadFromStorage()) {
-      createNote('yellow',   '', 'PRIORIDADE');
-      createNote('slate',    '', 'TRABALHO');
-      createNote('charcoal', '', 'IDEIAS');
-    }
-    showEmpty();
+    loadNotes();
   </script>
 </body>
 </html>
